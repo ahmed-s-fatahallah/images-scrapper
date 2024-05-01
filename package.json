@@ -1,0 +1,22 @@
+{
+  "name": "images-scrapper",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsc && node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@types/puppeteer": "^7.0.4",
+    "firebase-admin": "^12.1.0",
+    "puppeteer": "^22.7.1"
+  }
+}
