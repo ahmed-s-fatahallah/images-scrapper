@@ -15,8 +15,10 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
+    "@types/fs-extra": "^11.0.4",
     "@types/puppeteer": "^7.0.4",
     "firebase-admin": "^12.1.0",
+    "fs-extra": "^11.2.0",
     "puppeteer": "^22.7.1"
   }
 }

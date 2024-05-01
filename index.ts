@@ -1,0 +1,103 @@
+import puppeteer from "puppeteer";
+import fs from "fs-extra";
+import path from "path";
+import { fetchWithRetry } from "./utils.js";
+import { app, bucket } from "./firebaseInit.js";
+import { getDownloadURL } from "firebase-admin/storage";
+
+const config = {
+  defaultViewport: {
+    width: 1920,
+    height: 1080,
+  },
+} as const;
+
+const URL =
+  "https://www.allbirds.com/products/mens-tree-runner-go?price-tiers=msrp";
+
+const imagesFolderPath = path.join(import.meta.dirname, "../images");
+
+const downloadImages = async (
+  imgsSrcArr: (string | undefined)[],
+  title: string | null | undefined
+) => {
+  for (let i = 0; i < imgsSrcArr.length; i++) {
+    const productImg = imgsSrcArr[i];
+    if (productImg?.includes(".jpg")) continue;
+    // const regex = /(https:\/\/.*\.(png|jpg))/;
+    // const resultUrl = productImg?.match(regex)?.[0];
+    try {
+      const res = await fetchWithRetry(`https:${productImg}`, {});
+      const buffer = await res?.arrayBuffer();
+
+      if (!buffer) return;
+
+      if (!fs.existsSync(imagesFolderPath)) {
+        fs.mkdirSync(imagesFolderPath);
+      }
+
+      fs.writeFileSync(
+        `${imagesFolderPath}/${title}-${i}.png`,
+        Buffer.from(buffer)
+      );
+      console.log(`image downloaded-${i}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.log(error.message + " " + productImg);
+      }
+    }
+  }
+};
+
+const uploadImagesToFireBaseStorage = async (
+  title: string | null | undefined
+) => {
+  if (!fs.existsSync(imagesFolderPath)) return;
+
+  const imagesFilesArr = fs.readdirSync(imagesFolderPath);
+
+  for (let imageFile of imagesFilesArr) {
+    const file = bucket.file(`productsImages/${title}/${imageFile}`);
+
+    const fileWriteStream = file.createWriteStream();
+
+    fileWriteStream.on("error", (error) => {
+      console.error(
+        "Something is wrong! Unable to upload at the moment." + error
+      );
+    });
+
+    fileWriteStream.on("finish", async () => {
+      const downloadUrl = await getDownloadURL(file);
+      console.log(downloadUrl);
+    });
+
+    fileWriteStream.end(fs.readFileSync(`${imagesFolderPath}/${imageFile}`));
+  }
+};
+
+(async () => {
+  const browser = await puppeteer.launch(config);
+  const page = await browser.newPage();
+
+  await page.goto(URL);
+
+  await page.waitForNetworkIdle();
+
+  const productObj = await page.evaluate(() => {
+    const imgsSrcArr = Array.from<HTMLImageElement>(
+      document.querySelectorAll(".Carousel img")
+    ).map((img) => {
+      const src = img.getAttribute("data-src");
+      if (src) return src;
+    });
+    const imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
+
+    const title = document.querySelector("h1")?.textContent;
+    return { imgsSrcFiltered, title };
+  }, []);
+
+  await downloadImages(productObj.imgsSrcFiltered, productObj.title);
+  await uploadImagesToFireBaseStorage(productObj.title);
+  await browser.close();
+})();
