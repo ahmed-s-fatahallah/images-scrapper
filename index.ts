@@ -1,9 +1,10 @@
 import puppeteer from "puppeteer";
 import fs from "fs-extra";
-import path from "path";
+import path, { dirname } from "path";
 import { fetchWithRetry } from "./utils.js";
-import { app, bucket } from "./firebaseInit.js";
+import { bucket } from "./firebaseInit.js";
 import { getDownloadURL } from "firebase-admin/storage";
+import { fileURLToPath } from "url";
 
 const config = {
   defaultViewport: {
@@ -15,7 +16,10 @@ const config = {
 const URL =
   "https://www.allbirds.com/products/mens-tree-runner-go?price-tiers=msrp";
 
-const imagesFolderPath = path.join(import.meta.dirname, "../images");
+const imagesFolderPath = path.join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../images"
+);
 
 const downloadImages = async (
   imgsSrcArr: (string | undefined)[],
