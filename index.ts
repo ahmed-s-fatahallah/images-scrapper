@@ -150,7 +150,7 @@ const updateDataBase = async (
     .child(`${productRoute}/colors/0`)
     .update({ colorName, rgb, type, sliderImg: imagesUrls[0] });
   await productObjRef.child(productRoute).update({ title });
-  database.goOffline();
+  database.app.delete();
 
   console.log("Database Updated");
 };
