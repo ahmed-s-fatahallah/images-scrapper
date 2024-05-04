@@ -1,6 +1,6 @@
 export async function fetchWithRetry(
   url: URL | string,
-  options: RequestInit | undefined,
+  options?: RequestInit | undefined,
   maxRetries = 3
 ) {
   for (let i = 0; i < maxRetries; i++) {
@@ -13,3 +13,6 @@ export async function fetchWithRetry(
     }
   }
 }
+
+export const getProductRouteFromTitle = (title: string) =>
+  title.replaceAll("'", "").replaceAll(" ", "-")?.toLowerCase();
