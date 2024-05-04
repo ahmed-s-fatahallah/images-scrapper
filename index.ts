@@ -310,6 +310,7 @@ const updateRealTimeDataBaseWithColorsImgs = async (
         initProductData.title,
         i
       );
+
       if (initProductData.colorsArr[i + 1]) {
         await page.goto(`${URL}-${initProductData.colorsArr[i + 1]}`, {
           waitUntil: "networkidle0",
