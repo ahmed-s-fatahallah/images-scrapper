@@ -13,65 +13,12 @@ const config = {
   },
 } as const;
 
-const URL =
-  "https://www.allbirds.com/products/mens-tree-runner-go?price-tiers=msrp";
+const URL = "https://www.allbirds.com/products/mens-tree-runner-go";
 
 const imagesFolderPath = path.join(
   dirname(fileURLToPath(import.meta.url)),
   "../images"
 );
-
-const getProductDataWithPuppeteer = async () => {
-  const browser = await puppeteer.launch(config);
-  const page = await browser.newPage();
-  await page.goto(URL);
-  await page.waitForNetworkIdle();
-  const productObj = await page.evaluate(() => {
-    const imgsSrcArr = Array.from<HTMLImageElement>(
-      document.querySelectorAll(".Carousel img")
-    ).map((img) => {
-      const src = img.getAttribute("data-src");
-      if (src) return src;
-
-      return "";
-    });
-    const imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
-
-    // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
-    imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
-
-    const productRoute = window.location.pathname.split("/")[2];
-
-    const title = document.querySelector("h1")?.textContent;
-
-    const colorName =
-      document.querySelector(".Overview__name")?.textContent ?? "";
-
-    const colorBtnEl = document.querySelector(
-      ".ColorSwatchButton--active > .ColorSwatch"
-    );
-
-    let rgbValue = "";
-    if (colorBtnEl) rgbValue = getComputedStyle(colorBtnEl)?.backgroundImage;
-    const colorType =
-      document
-        .querySelector(".Overview__name")
-        ?.previousSibling?.textContent?.substring(0, 7)
-        ?.toLowerCase() ?? "";
-
-    return {
-      imgsSrcFiltered,
-      title,
-      productRoute,
-      colorName,
-      rgbValue,
-      colorType,
-    };
-  }, []);
-
-  await browser.close();
-  return productObj;
-};
 
 const downloadImages = async (imgsSrcArr: string[], title: string) => {
   for (let i = 0; i < imgsSrcArr.length; i++) {
@@ -102,14 +49,19 @@ const downloadImages = async (imgsSrcArr: string[], title: string) => {
   }
 };
 
-const uploadImagesToFireBaseStorage = async (title: string) => {
+const uploadImagesToFireBaseStorage = async (
+  title: string,
+  colorName: string
+) => {
   if (!fs.existsSync(imagesFolderPath)) return;
 
   const imagesFilesArr = fs.readdirSync(imagesFolderPath);
 
   const uploadPromises = imagesFilesArr.map((imageFile) => {
     return new Promise((resolve: (downloadUrl: string) => void, reject) => {
-      const file = bucket.file(`productsImages/${title}/${imageFile}`);
+      const file = bucket.file(
+        `productsImages/${title}/${colorName}/${imageFile}`
+      );
 
       const fileWriteStream = file.createWriteStream();
 
@@ -138,42 +90,128 @@ const uploadImagesToFireBaseStorage = async (title: string) => {
   return await Promise.all(uploadPromises);
 };
 
-const updateDataBase = async (
+const updateRealTimeDataBase = async (
   imagesUrls: string[],
-  title: string,
   colorName: string,
   rgb: string,
   type: string,
-  productRoute: string
+  productTitle: string,
+  index: number
 ) => {
+  const productRoute = productTitle
+    .replaceAll("'", "")
+    .replaceAll(" ", "-")
+    ?.toLowerCase();
   const productObjRef = database.ref("products");
-  await productObjRef.child(`${productRoute}/colors/0/imgs`).set(imagesUrls);
   await productObjRef
-    .child(`${productRoute}/colors/0`)
+    .child(`${productRoute}/colors/${index}/imgs`)
+    .set(imagesUrls);
+  await productObjRef
+    .child(`${productRoute}/colors/${index}`)
     .update({ colorName, rgb, type, sliderImg: imagesUrls[0] });
-  await productObjRef.child(productRoute).update({ title });
-  database.app.delete();
 
   console.log("Database Updated");
 };
 
 (async () => {
-  const productObj = await getProductDataWithPuppeteer();
-  if (!productObj.imgsSrcFiltered || !productObj.title) return;
+  const browser = await puppeteer.launch(config);
+  const page = await browser.newPage();
+  await page.goto(URL, { waitUntil: "networkidle0", timeout: 0 });
 
-  await downloadImages(productObj.imgsSrcFiltered, productObj.title);
+  await page.click(".Modal__close");
 
-  const imagesUrlsArr = await uploadImagesToFireBaseStorage(productObj.title);
+  const getProductObj = () => {
+    return page.evaluate(() => {
+      const imgsSrcArr = Array.from<HTMLImageElement>(
+        document.querySelectorAll(".Carousel img")
+      ).map((img) => {
+        const src = img.getAttribute("data-src");
+        if (src) return src;
 
-  if (!imagesUrlsArr)
-    throw new Error("Uploading images to firebase storage failed");
+        return "";
+      });
+      const imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
 
-  await updateDataBase(
-    imagesUrlsArr,
-    productObj.title,
-    productObj.colorName,
-    productObj.rgbValue,
-    productObj.colorType,
-    productObj.productRoute
-  );
+      // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
+      imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
+
+      const title = document.querySelector("h1")?.textContent;
+
+      const colorName =
+        document.querySelector(".Overview__name")?.textContent ?? "";
+
+      const colorBtnEl = document.querySelector(
+        ".ColorSwatchButton--active > .ColorSwatch"
+      );
+
+      let rgbValue = "";
+      if (colorBtnEl) {
+        const colorBtnElStyles = getComputedStyle(colorBtnEl);
+        rgbValue =
+          colorBtnElStyles.backgroundImage !== "none"
+            ? colorBtnElStyles.backgroundImage
+            : colorBtnElStyles.backgroundColor;
+      }
+      const colorType =
+        document
+          .querySelector(".Overview__name")
+          ?.previousSibling?.textContent?.substring(0, 7)
+          ?.toLowerCase() ?? "";
+
+      return {
+        imgsSrcFiltered,
+        title,
+        colorName,
+        rgbValue,
+        colorType,
+      };
+    });
+  };
+
+  const colorsArray = await page.evaluate(() => {
+    const buttonsArr = Array.from(
+      document.querySelectorAll<HTMLButtonElement>(".ColorSwatchButton")
+    );
+    return buttonsArr.map((button) =>
+      button.ariaLabel
+        ?.match(/color\s+(.*?)\s+\(/)?.[1]
+        ?.replace(" ", "-")
+        ?.toLowerCase()
+    );
+  });
+
+  for (let i = 0; i < colorsArray.length; i++) {
+    try {
+      const productObj = await getProductObj();
+      if (!productObj.imgsSrcFiltered || !productObj.title) return;
+      await downloadImages(productObj.imgsSrcFiltered, productObj.title);
+      const imagesUrlsArr = await uploadImagesToFireBaseStorage(
+        productObj.title,
+        productObj.colorName
+      );
+      if (!imagesUrlsArr)
+        throw new Error("Uploading images to firebase storage failed");
+      await updateRealTimeDataBase(
+        imagesUrlsArr,
+        productObj.colorName,
+        productObj.rgbValue,
+        productObj.colorType,
+        productObj.title,
+        i
+      );
+
+      if (colorsArray[i + 1]) {
+        await page.goto(`${URL}-${colorsArray[i + 1]}`, {
+          waitUntil: "networkidle0",
+          timeout: 0,
+        });
+      }
+    } catch (error) {
+      if (error instanceof Error)
+        console.log(`message: ${error.message}/ cause: ${error.cause}`);
+    }
+  }
+
+  await browser.close();
+  await database.app.delete();
 })();
