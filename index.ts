@@ -229,51 +229,49 @@ const updateRealTimeDataBase = async (
     return { colorsArr, videoSrc, thumbnailSrc, displayImgSrc };
   });
 
-  console.log(initProductData);
+  for (let i = 0; i < initProductData.colorsArr.length; i++) {
+    try {
+      const productObj = await getProductObj();
+      if (
+        !productObj.imgsSrcFiltered ||
+        productObj.imgsSrcFiltered.length === 0 ||
+        !productObj.title
+      ) {
+        if (initProductData.colorsArr[i + 1]) {
+          await page.goto(`${URL}-${initProductData.colorsArr[i + 1]}`, {
+            waitUntil: "networkidle0",
+            timeout: 0,
+          });
+        }
+        continue;
+      }
 
-  // for (let i = 0; i < initProductData.colorsArr.length; i++) {
-  //   try {
-  //     const productObj = await getProductObj();
-  //     if (
-  //       !productObj.imgsSrcFiltered ||
-  //       productObj.imgsSrcFiltered.length === 0 ||
-  //       !productObj.title
-  //     ) {
-  //       if (initProductData.colorsArr[i + 1]) {
-  //         await page.goto(`${URL}-${initProductData.colorsArr[i + 1]}`, {
-  //           waitUntil: "networkidle0",
-  //           timeout: 0,
-  //         });
-  //       }
-  //       continue;
-  //     }
-
-  //     await downloadImages(productObj.imgsSrcFiltered, productObj.title);
-  //     const imagesUrlsArr = await uploadImagesToFireBaseStorage(
-  //       productObj.title,
-  //       productObj.colorName
-  //     );
-  //     if (!imagesUrlsArr)
-  //       throw new Error("Uploading images to firebase storage failed");
-  //     await updateRealTimeDataBase(
-  //       imagesUrlsArr,
-  //       productObj.colorName,
-  //       productObj.rgbValue,
-  //       productObj.colorType,
-  //       productObj.title,
-  //       i
-  //     );
-  //     if (initProductData.colorsArr[i + 1]) {
-  //       await page.goto(`${URL}-${initProductData.colorsArr[i + 1]}`, {
-  //         waitUntil: "networkidle0",
-  //         timeout: 0,
-  //       });
-  //     }
-  //   } catch (error) {
-  //     if (error instanceof Error)
-  //       console.log(`message: ${error.message}/ cause: ${error.cause}`);
-  //   }
-  // }
+      await downloadImages(productObj.imgsSrcFiltered, productObj.title);
+      const imagesUrlsArr = await uploadImagesToFireBaseStorage(
+        productObj.title,
+        productObj.colorName
+      );
+      if (!imagesUrlsArr)
+        throw new Error("Uploading images to firebase storage failed");
+      await updateRealTimeDataBase(
+        imagesUrlsArr,
+        productObj.colorName,
+        productObj.rgbValue,
+        productObj.colorType,
+        productObj.title,
+        i
+      );
+      if (initProductData.colorsArr[i + 1]) {
+        await page.goto(`${URL}-${initProductData.colorsArr[i + 1]}`, {
+          waitUntil: "networkidle0",
+          timeout: 0,
+        });
+      }
+    } catch (error) {
+      if (error instanceof Error)
+        console.log(`message: ${error.message}/ cause: ${error.cause}`);
+    }
+  }
 
   await browser.close();
   await database.app.delete();
