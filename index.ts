@@ -37,7 +37,7 @@ const getProductDataWithPuppeteer = async () => {
     });
     const imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
 
-    // to arrange the urls correctly
+    // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
     imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
 
     const productRoute = window.location.pathname.split("/")[2];
@@ -47,7 +47,9 @@ const getProductDataWithPuppeteer = async () => {
     const colorName =
       document.querySelector(".Overview__name")?.textContent ?? "";
 
-    const colorBtnEl = document.querySelector(".ColorSwatch");
+    const colorBtnEl = document.querySelector(
+      ".ColorSwatchButton--active > .ColorSwatch"
+    );
 
     let rgbValue = "";
     if (colorBtnEl) rgbValue = getComputedStyle(colorBtnEl)?.backgroundImage;
