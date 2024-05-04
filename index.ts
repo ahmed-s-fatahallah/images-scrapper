@@ -122,29 +122,30 @@ const updateRealTimeDataBase = async (
   await page.goto(URL, { waitUntil: "networkidle0", timeout: 0 });
 
   await page.click(".Modal__close");
+  await page.click(".HomepageCarouselArrow");
+
+  await page.waitForSelector(".VideoPlayer__player > video", { timeout: 0 });
 
   const getProductObj = () => {
     return page.evaluate(() => {
       let imgsSrcFiltered: string[] = [];
       let rgbValue = "";
 
-      const carouselWrapper = document.querySelector<HTMLDivElement>(
-        ".PdpCarouselWrapper__hero-gallery--thumbnails"
-      );
-      if (carouselWrapper) {
-        const imgsSrcArr = Array.from<HTMLImageElement>(
-          carouselWrapper.querySelectorAll(".Carousel img")
-        ).map((img) => {
-          const src = img.getAttribute("data-src");
-          if (src) return src;
+      const imgsSrcArr = Array.from(
+        document.querySelectorAll<HTMLImageElement>(
+          ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
+        )
+      ).map((img) => {
+        const src = img.getAttribute("data-src");
+        if (src) return src;
 
-          return "";
-        });
-        imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
+        return "";
+      });
 
-        // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
-        imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
-      }
+      imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
+
+      // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
+      imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
 
       const title = document.querySelector("h1")?.textContent;
 
@@ -178,48 +179,101 @@ const updateRealTimeDataBase = async (
     });
   };
 
-  const colorsArray = await page.evaluate(() => {
+  const initProductData = await page.evaluate(() => {
+    let videoSrc = "";
+    let thumbnailSrc = "";
+
     const buttonsArr = Array.from(
       document.querySelectorAll<HTMLButtonElement>(".ColorSwatchButton")
     );
-    return buttonsArr.map((button) =>
-      button.ariaLabel
-        ?.match(/color\s+(.*?)\s+\(/)?.[1]
-        ?.replace(/\s+|\//g, "-")
-        ?.toLowerCase()
+
+    const videoEl = document.querySelector<HTMLVideoElement>(
+      ".VideoPlayer__player > video"
     );
+
+    if (videoEl) videoSrc = videoEl.src;
+
+    const sidebarImgs = Array.from(
+      document.querySelectorAll<HTMLImageElement>(".ThumbnailButton > img")
+    );
+
+    if (sidebarImgs) {
+      const VideoThumbnailImgEl = sidebarImgs.find((img) =>
+        img.getAttribute("data-testid")?.includes("video")
+      );
+
+      if (VideoThumbnailImgEl) {
+        thumbnailSrc = VideoThumbnailImgEl.getAttribute("data-src") || "";
+      }
+    }
+
+    const displayImgSrc = Array.from(
+      document.querySelectorAll<HTMLImageElement>(
+        ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
+      )
+    )
+      .find((img) => img.getAttribute("data-src")?.includes("jpg"))
+      ?.getAttribute("data-src");
+
+    const colorsArr = Array.from(
+      new Set(
+        buttonsArr.map((button) =>
+          button.ariaLabel
+            ?.match(/color\s+(.*?)\s+\(/)?.[1]
+            ?.replace(/\s+|\//g, "-")
+            ?.toLowerCase()
+        )
+      )
+    );
+
+    return { colorsArr, videoSrc, thumbnailSrc, displayImgSrc };
   });
 
-  for (let i = 0; i < colorsArray.length; i++) {
-    try {
-      const productObj = await getProductObj();
-      if (!productObj.imgsSrcFiltered || !productObj.title) return;
-      await downloadImages(productObj.imgsSrcFiltered, productObj.title);
-      const imagesUrlsArr = await uploadImagesToFireBaseStorage(
-        productObj.title,
-        productObj.colorName
-      );
-      if (!imagesUrlsArr)
-        throw new Error("Uploading images to firebase storage failed");
-      await updateRealTimeDataBase(
-        imagesUrlsArr,
-        productObj.colorName,
-        productObj.rgbValue,
-        productObj.colorType,
-        productObj.title,
-        i
-      );
-      if (colorsArray[i + 1]) {
-        await page.goto(`${URL}-${colorsArray[i + 1]}`, {
-          waitUntil: "networkidle0",
-          timeout: 0,
-        });
-      }
-    } catch (error) {
-      if (error instanceof Error)
-        console.log(`message: ${error.message}/ cause: ${error.cause}`);
-    }
-  }
+  console.log(initProductData);
+
+  // for (let i = 0; i < initProductData.colorsArr.length; i++) {
+  //   try {
+  //     const productObj = await getProductObj();
+  //     if (
+  //       !productObj.imgsSrcFiltered ||
+  //       productObj.imgsSrcFiltered.length === 0 ||
+  //       !productObj.title
+  //     ) {
+  //       if (initProductData.colorsArr[i + 1]) {
+  //         await page.goto(`${URL}-${initProductData.colorsArr[i + 1]}`, {
+  //           waitUntil: "networkidle0",
+  //           timeout: 0,
+  //         });
+  //       }
+  //       continue;
+  //     }
+
+  //     await downloadImages(productObj.imgsSrcFiltered, productObj.title);
+  //     const imagesUrlsArr = await uploadImagesToFireBaseStorage(
+  //       productObj.title,
+  //       productObj.colorName
+  //     );
+  //     if (!imagesUrlsArr)
+  //       throw new Error("Uploading images to firebase storage failed");
+  //     await updateRealTimeDataBase(
+  //       imagesUrlsArr,
+  //       productObj.colorName,
+  //       productObj.rgbValue,
+  //       productObj.colorType,
+  //       productObj.title,
+  //       i
+  //     );
+  //     if (initProductData.colorsArr[i + 1]) {
+  //       await page.goto(`${URL}-${initProductData.colorsArr[i + 1]}`, {
+  //         waitUntil: "networkidle0",
+  //         timeout: 0,
+  //       });
+  //     }
+  //   } catch (error) {
+  //     if (error instanceof Error)
+  //       console.log(`message: ${error.message}/ cause: ${error.cause}`);
+  //   }
+  // }
 
   await browser.close();
   await database.app.delete();
