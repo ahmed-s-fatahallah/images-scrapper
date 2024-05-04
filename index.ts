@@ -185,7 +185,7 @@ const updateRealTimeDataBase = async (
     return buttonsArr.map((button) =>
       button.ariaLabel
         ?.match(/color\s+(.*?)\s+\(/)?.[1]
-        ?.replace(" ", "-")
+        ?.replace(/\s+|\//g, "-")
         ?.toLowerCase()
     );
   });
@@ -209,7 +209,6 @@ const updateRealTimeDataBase = async (
         productObj.title,
         i
       );
-
       if (colorsArray[i + 1]) {
         await page.goto(`${URL}-${colorsArray[i + 1]}`, {
           waitUntil: "networkidle0",
