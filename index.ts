@@ -1,7 +1,7 @@
 import puppeteer from "puppeteer";
 import fs from "fs-extra";
 import path, { dirname } from "path";
-import { fetchWithRetry } from "./utils.js";
+import { fetchWithRetry, getProductRouteFromTitle } from "./utils.js";
 import { bucket, database } from "./firebaseInit.js";
 import { getDownloadURL } from "firebase-admin/storage";
 import { fileURLToPath } from "url";
@@ -21,77 +21,89 @@ const imagesFolderPath = path.join(
   "../images"
 );
 
-const downloadImages = async (imgsSrcArr: string[], title: string) => {
-  for (let i = 0; i < imgsSrcArr.length; i++) {
-    const productImg = imgsSrcArr[i];
-    if (productImg?.includes(".jpg")) continue;
-    // const regex = /(https:\/\/.*\.(png|jpg))/;
-    // const resultUrl = productImg?.match(regex)?.[0];
+const initDataFolderPath = path.join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../initData"
+);
+
+const downloadFiles = async (
+  fileName: string,
+  urls: string[],
+  folderPath: string
+) => {
+  for (let i = 0; i < urls.length; i++) {
+    let extension = urls[i].match(/\.(\w+)(\?|$)/)?.[1];
+    const url = urls[i].startsWith("http") ? urls[i] : `https:${urls[i]}`;
     try {
-      const res = await fetchWithRetry(`https:${productImg}`, {});
-      const buffer = await res?.arrayBuffer();
+      const res = await fetchWithRetry(url);
+      if (!res) throw new Error("No response");
 
-      if (!buffer) return;
-
-      if (!fs.existsSync(imagesFolderPath)) {
-        fs.mkdirSync(imagesFolderPath);
+      if (!fs.existsSync(folderPath)) {
+        fs.mkdirSync(folderPath);
       }
 
+      const buffer = await res.arrayBuffer();
+      if (!buffer) throw new Error("no buffer found");
       fs.writeFileSync(
-        `${imagesFolderPath}/${title}-${i}.png`,
+        `${folderPath}/${fileName}${
+          urls.length > 1 ? `-${i}` : ""
+        }.${extension}`,
         Buffer.from(buffer)
       );
-      console.log(`image downloaded-${i}`);
+
+      console.log(`file downloaded`);
     } catch (error) {
       if (error instanceof Error) {
-        console.log(error.message + " " + productImg);
+        console.log(error.message);
       }
     }
   }
 };
 
-const uploadImagesToFireBaseStorage = async (
-  title: string,
-  colorName: string
+const uploadFilesToFirebaseStorage = async (
+  uploadTo: string,
+  folderPath: string
 ) => {
-  if (!fs.existsSync(imagesFolderPath)) return;
+  if (!fs.existsSync(folderPath)) return;
 
-  const imagesFilesArr = fs.readdirSync(imagesFolderPath);
+  const filesArr = fs.readdirSync(folderPath);
 
-  const uploadPromises = imagesFilesArr.map((imageFile) => {
-    return new Promise((resolve: (downloadUrl: string) => void, reject) => {
-      const file = bucket.file(
-        `productsImages/${title}/${colorName}/${imageFile}`
-      );
+  const uploadPromises = filesArr.map((currentFile) => {
+    return new Promise(
+      (resolve: (fileData: { [name: string]: string }) => void, reject) => {
+        const file = bucket.file(`${uploadTo}/${currentFile}`);
 
-      const fileWriteStream = file.createWriteStream();
+        const fileWriteStream = file.createWriteStream();
 
-      fileWriteStream.on("error", (error) => {
-        console.error(
-          "Something is wrong! Unable to upload at the moment." + error
+        fileWriteStream.on("error", (error) => {
+          console.error(
+            "Something is wrong! Unable to upload at the moment." + error
+          );
+          reject(error);
+        });
+
+        fileWriteStream.on("finish", async () => {
+          const downloadUrl = await getDownloadURL(file);
+          console.log(`File uploaded ${currentFile}`);
+          resolve({
+            [currentFile.match(/^.*(?=\.)/)?.[0] || "name"]: downloadUrl,
+          });
+        });
+
+        fileWriteStream.end(
+          fs.readFileSync(`${folderPath}/${currentFile}`),
+          () => {
+            fs.removeSync(`${folderPath}/${currentFile}`);
+          }
         );
-        reject(error);
-      });
-
-      fileWriteStream.on("finish", async () => {
-        const downloadUrl = await getDownloadURL(file);
-        console.log(`Image uploaded ${imageFile}`);
-        resolve(downloadUrl);
-      });
-
-      fileWriteStream.end(
-        fs.readFileSync(`${imagesFolderPath}/${imageFile}`),
-        () => {
-          fs.removeSync(`${imagesFolderPath}/${imageFile}`);
-        }
-      );
-    });
+      }
+    );
   });
 
   return await Promise.all(uploadPromises);
 };
 
-const updateRealTimeDataBase = async (
+const updateRealTimeDataBaseWithColorsImgs = async (
   imagesUrls: string[],
   colorName: string,
   rgb: string,
@@ -99,10 +111,7 @@ const updateRealTimeDataBase = async (
   productTitle: string,
   index: number
 ) => {
-  const productRoute = productTitle
-    .replaceAll("'", "")
-    .replaceAll(" ", "-")
-    ?.toLowerCase();
+  const productRoute = getProductRouteFromTitle(productTitle);
   const productObjRef = database.ref("products");
   await productObjRef
     .child(`${productRoute}/colors/${index}/imgs`)
@@ -135,19 +144,19 @@ const updateRealTimeDataBase = async (
         document.querySelectorAll<HTMLImageElement>(
           ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
         )
-      ).map((img) => {
-        const src = img.getAttribute("data-src");
-        if (src) return src;
+      )
+        .map((img) => {
+          const src = img.getAttribute("data-src");
+          if (src) return src;
 
-        return "";
-      });
+          return "";
+        })
+        .filter((src) => src.includes(".png"));
 
       imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
 
       // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
       imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
-
-      const title = document.querySelector("h1")?.textContent;
 
       const colorName =
         document.querySelector(".Overview__name")?.textContent ?? "";
@@ -171,7 +180,6 @@ const updateRealTimeDataBase = async (
 
       return {
         imgsSrcFiltered,
-        title,
         colorName,
         rgbValue,
         colorType,
@@ -182,6 +190,8 @@ const updateRealTimeDataBase = async (
   const initProductData = await page.evaluate(() => {
     let videoSrc = "";
     let thumbnailSrc = "";
+
+    const title = document.querySelector("h1")?.textContent || "N/A";
 
     const buttonsArr = Array.from(
       document.querySelectorAll<HTMLButtonElement>(".ColorSwatchButton")
@@ -207,27 +217,54 @@ const updateRealTimeDataBase = async (
       }
     }
 
-    const displayImgSrc = Array.from(
-      document.querySelectorAll<HTMLImageElement>(
-        ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
+    const displayImgSrc =
+      Array.from(
+        document.querySelectorAll<HTMLImageElement>(
+          ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
+        )
       )
-    )
-      .find((img) => img.getAttribute("data-src")?.includes("jpg"))
-      ?.getAttribute("data-src");
+        .find((img) => img.getAttribute("data-src")?.includes("jpg"))
+        ?.getAttribute("data-src") ?? "";
 
     const colorsArr = Array.from(
       new Set(
-        buttonsArr.map((button) =>
-          button.ariaLabel
-            ?.match(/color\s+(.*?)\s+\(/)?.[1]
-            ?.replace(/\s+|\//g, "-")
-            ?.toLowerCase()
+        buttonsArr.map(
+          (button) =>
+            button.ariaLabel
+              ?.match(/color\s+(.*?)\s+\(/)?.[1]
+              ?.replace(/\s+|\//g, "-")
+              ?.toLowerCase() ?? ""
         )
       )
     );
 
-    return { colorsArr, videoSrc, thumbnailSrc, displayImgSrc };
+    return {
+      colorsArr,
+      title,
+      initData: {
+        video: videoSrc,
+        videoThumbnail: thumbnailSrc,
+        displayImg: displayImgSrc,
+      },
+    };
   });
+
+  for (let [name, url] of Object.entries(initProductData.initData)) {
+    await downloadFiles(name, [url], initDataFolderPath);
+  }
+
+  const filesDataArr = await uploadFilesToFirebaseStorage(
+    `productsImages/${initProductData.title}`,
+    initDataFolderPath
+  );
+
+  if (filesDataArr) {
+    const productRoute = getProductRouteFromTitle(initProductData.title);
+    const productObjRef = database.ref("products");
+    for (let file of filesDataArr) {
+      await productObjRef.child(`${productRoute}`).update(file);
+    }
+  }
 
   for (let i = 0; i < initProductData.colorsArr.length; i++) {
     try {
@@ -235,7 +272,7 @@ const updateRealTimeDataBase = async (
       if (
         !productObj.imgsSrcFiltered ||
         productObj.imgsSrcFiltered.length === 0 ||
-        !productObj.title
+        !initProductData.title
       ) {
         if (initProductData.colorsArr[i + 1]) {
           await page.goto(`${URL}-${initProductData.colorsArr[i + 1]}`, {
@@ -246,19 +283,31 @@ const updateRealTimeDataBase = async (
         continue;
       }
 
-      await downloadImages(productObj.imgsSrcFiltered, productObj.title);
-      const imagesUrlsArr = await uploadImagesToFireBaseStorage(
-        productObj.title,
-        productObj.colorName
+      await downloadFiles(
+        initProductData.title,
+        productObj.imgsSrcFiltered,
+        imagesFolderPath
       );
-      if (!imagesUrlsArr)
+
+      const imagesObjArr = await uploadFilesToFirebaseStorage(
+        `productsImages/${initProductData.title}/${productObj.colorName}`,
+        imagesFolderPath
+      );
+
+      if (!imagesObjArr)
         throw new Error("Uploading images to firebase storage failed");
-      await updateRealTimeDataBase(
-        imagesUrlsArr,
+
+      const imagesUrls = imagesObjArr.reduce((acc: string[], img) => {
+        acc.push(Object.values(img)[0]);
+        return acc;
+      }, []);
+
+      await updateRealTimeDataBaseWithColorsImgs(
+        imagesUrls,
         productObj.colorName,
         productObj.rgbValue,
         productObj.colorType,
-        productObj.title,
+        initProductData.title,
         i
       );
       if (initProductData.colorsArr[i + 1]) {
