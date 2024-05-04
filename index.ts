@@ -13,7 +13,8 @@ const config = {
   },
 } as const;
 
-const URL = "https://www.allbirds.com/products/mens-tree-runner-go";
+// Pass the product url as an argument from the terminal
+const URL = process.argv.find((arg) => arg.includes("http"));
 
 const imagesFolderPath = path.join(
   dirname(fileURLToPath(import.meta.url)),
@@ -114,6 +115,8 @@ const updateRealTimeDataBase = async (
 };
 
 (async () => {
+  if (!URL) return;
+
   const browser = await puppeteer.launch(config);
   const page = await browser.newPage();
   await page.goto(URL, { waitUntil: "networkidle0", timeout: 0 });
