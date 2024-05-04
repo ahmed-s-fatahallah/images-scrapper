@@ -111,7 +111,7 @@ const updateRealTimeDataBase = async (
     .child(`${productRoute}/colors/${index}`)
     .update({ colorName, rgb, type, sliderImg: imagesUrls[0] });
 
-  console.log("Database Updated");
+  console.log(`Database Updated-${index}`);
 };
 
 (async () => {
@@ -125,18 +125,26 @@ const updateRealTimeDataBase = async (
 
   const getProductObj = () => {
     return page.evaluate(() => {
-      const imgsSrcArr = Array.from<HTMLImageElement>(
-        document.querySelectorAll(".Carousel img")
-      ).map((img) => {
-        const src = img.getAttribute("data-src");
-        if (src) return src;
+      let imgsSrcFiltered: string[] = [];
+      let rgbValue = "";
 
-        return "";
-      });
-      const imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
+      const carouselWrapper = document.querySelector<HTMLDivElement>(
+        ".PdpCarouselWrapper__hero-gallery--thumbnails"
+      );
+      if (carouselWrapper) {
+        const imgsSrcArr = Array.from<HTMLImageElement>(
+          carouselWrapper.querySelectorAll(".Carousel img")
+        ).map((img) => {
+          const src = img.getAttribute("data-src");
+          if (src) return src;
 
-      // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
-      imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
+          return "";
+        });
+        imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
+
+        // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
+        imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
+      }
 
       const title = document.querySelector("h1")?.textContent;
 
@@ -147,7 +155,6 @@ const updateRealTimeDataBase = async (
         ".ColorSwatchButton--active > .ColorSwatch"
       );
 
-      let rgbValue = "";
       if (colorBtnEl) {
         const colorBtnElStyles = getComputedStyle(colorBtnEl);
         rgbValue =
