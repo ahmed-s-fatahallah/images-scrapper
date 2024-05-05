@@ -149,9 +149,9 @@ const updateRealTimeDataBaseWithColorsImgs = async (
         ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
       );
       if (imgsEls.length > 1) {
-        const imgsSrcArr = Array.from(imgsEls)
-          .map((img) => img.getAttribute("data-src") ?? img.src)
-          .filter((src) => !src?.includes("PDP"));
+        const imgsSrcArr = Array.from(imgsEls).map(
+          (img) => img.getAttribute("data-src") ?? img.src
+        );
 
         imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
 
@@ -221,15 +221,6 @@ const updateRealTimeDataBaseWithColorsImgs = async (
       }
     }
 
-    const displayImgSrc =
-      Array.from(
-        document.querySelectorAll<HTMLImageElement>(
-          ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
-        )
-      )
-        .find((img) => img.getAttribute("data-src")?.includes("PDP"))
-        ?.getAttribute("data-src") ?? "";
-
     const colorsArr = Array.from(
       new Set(
         buttonsArr.map(
@@ -248,7 +239,6 @@ const updateRealTimeDataBaseWithColorsImgs = async (
       initData: {
         video: videoSrc,
         videoThumbnail: thumbnailSrc,
-        displayImg: displayImgSrc,
       },
     };
   });
@@ -268,9 +258,7 @@ const updateRealTimeDataBaseWithColorsImgs = async (
       await productObjRef.child(`${productRoute}`).update(file);
     }
 
-    console.log(
-      "updated realtime database with video, video thumbnail and display image"
-    );
+    console.log("updated realtime database with video and video thumbnail");
   }
 
   let colorPosition = 0;
