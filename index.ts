@@ -177,8 +177,8 @@ const updateRealTimeDataBaseWithColorsImgs = async (
       const colorType =
         document
           .querySelector(".Overview__name")
-          ?.previousSibling?.textContent?.substring(0, 7)
-          ?.toLowerCase() ?? "";
+          ?.previousSibling?.textContent?.toLowerCase()
+          ?.match(/\w*/)?.[0] ?? "";
 
       return {
         imgsSrcFiltered,
