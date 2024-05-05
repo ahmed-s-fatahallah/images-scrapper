@@ -269,6 +269,8 @@ const updateRealTimeDataBaseWithColorsImgs = async (
     );
   }
 
+  let colorPosition = 0;
+
   for (let i = 0; i < initProductData.colorsArr.length; i++) {
     try {
       const productObj = await getProductObj();
@@ -311,8 +313,10 @@ const updateRealTimeDataBaseWithColorsImgs = async (
         productObj.rgbValue,
         productObj.colorType,
         initProductData.title,
-        i
+        colorPosition
       );
+
+      colorPosition++;
 
       if (initProductData.colorsArr[i + 1]) {
         await page.goto(`${URL}-${initProductData.colorsArr[i + 1]}`, {
