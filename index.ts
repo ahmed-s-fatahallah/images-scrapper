@@ -132,10 +132,13 @@ const updateRealTimeDataBaseWithColorsImgs = async (
 
   await page.click(".Modal__close");
   await page.click(".HomepageCarouselArrow");
-
-  await page.waitForSelector(".VideoPlayer__player > video", {
-    timeout: 5000,
-  });
+  try {
+    await page.waitForSelector(".VideoPlayer__player > video", {
+      timeout: 5000,
+    });
+  } catch (error) {
+    console.log(`product has no video`);
+  }
 
   const getProductObj = () => {
     return page.evaluate(() => {
