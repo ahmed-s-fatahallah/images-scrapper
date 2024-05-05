@@ -140,23 +140,19 @@ const updateRealTimeDataBaseWithColorsImgs = async (
       let imgsSrcFiltered: string[] = [];
       let rgbValue = "";
 
-      const imgsSrcArr = Array.from(
-        document.querySelectorAll<HTMLImageElement>(
-          ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
-        )
-      )
-        .map((img) => {
-          const src = img.getAttribute("data-src");
-          if (src) return src;
+      const imgsEls = document.querySelectorAll<HTMLImageElement>(
+        ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
+      );
+      if (imgsEls.length > 1) {
+        const imgsSrcArr = Array.from(imgsEls)
+          .map((img) => img.getAttribute("data-src") || img.src)
+          .filter((src) => src?.includes(".png"));
 
-          return "";
-        })
-        .filter((src) => src.includes(".png"));
+        imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
 
-      imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
-
-      // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
-      imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
+        // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
+        imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
+      }
 
       const colorName =
         document.querySelector(".Overview__name")?.textContent ?? "";
@@ -249,6 +245,7 @@ const updateRealTimeDataBaseWithColorsImgs = async (
     };
   });
 
+  console.log(initProductData.colorsArr);
   for (let [name, url] of Object.entries(initProductData.initData)) {
     await downloadFiles(name, [url], initDataFolderPath);
   }
@@ -264,6 +261,10 @@ const updateRealTimeDataBaseWithColorsImgs = async (
     for (let file of filesDataArr) {
       await productObjRef.child(`${productRoute}`).update(file);
     }
+
+    console.log(
+      "updated realtime database with video, video thumbnail and display image"
+    );
   }
 
   for (let i = 0; i < initProductData.colorsArr.length; i++) {
