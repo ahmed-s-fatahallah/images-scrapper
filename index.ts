@@ -1,7 +1,7 @@
 import puppeteer from "puppeteer";
 import fs from "fs-extra";
 import path, { dirname } from "path";
-import { fetchWithRetry, getProductRouteFromTitle } from "./utils.js";
+import { fetchWithRetry } from "./utils.js";
 import { bucket, database } from "./firebaseInit.js";
 import { getDownloadURL } from "firebase-admin/storage";
 import { fileURLToPath } from "url";
@@ -15,6 +15,8 @@ const config = {
 
 // Pass the product url as an argument from the terminal
 const URL = process.argv.find((arg) => arg.includes("http"));
+
+const productRoute = URL?.substring(URL?.lastIndexOf("/") + 1);
 
 const imagesFolderPath = path.join(
   dirname(fileURLToPath(import.meta.url)),
@@ -108,10 +110,8 @@ const updateRealTimeDataBaseWithColorsImgs = async (
   colorName: string,
   rgb: string,
   type: string,
-  productTitle: string,
   index: number
 ) => {
-  const productRoute = getProductRouteFromTitle(productTitle);
   const productObjRef = database.ref("products");
   await productObjRef
     .child(`${productRoute}/colors/${index}/imgs`)
@@ -263,7 +263,6 @@ const updateRealTimeDataBaseWithColorsImgs = async (
   );
 
   if (filesDataArr) {
-    const productRoute = getProductRouteFromTitle(initProductData.title);
     const productObjRef = database.ref("products");
     for (let file of filesDataArr) {
       await productObjRef.child(`${productRoute}`).update(file);
@@ -317,7 +316,6 @@ const updateRealTimeDataBaseWithColorsImgs = async (
         productObj.colorName,
         productObj.rgbValue,
         productObj.colorType,
-        initProductData.title,
         colorPosition
       );
 

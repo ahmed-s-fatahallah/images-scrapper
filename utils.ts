@@ -13,6 +13,3 @@ export async function fetchWithRetry(
     }
   }
 }
-
-export const getProductRouteFromTitle = (title: string) =>
-  title.replaceAll("'", "").replaceAll(" ", "-")?.toLowerCase();
