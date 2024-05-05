@@ -86,7 +86,7 @@ const uploadFilesToFirebaseStorage = async (
           const downloadUrl = await getDownloadURL(file);
           console.log(`File uploaded ${currentFile}`);
           resolve({
-            [currentFile.match(/^.*(?=\.)/)?.[0] || "name"]: downloadUrl,
+            [currentFile.match(/^.*(?=\.)/)?.[0] ?? "name"]: downloadUrl,
           });
         });
 
@@ -145,13 +145,14 @@ const updateRealTimeDataBaseWithColorsImgs = async (
       );
       if (imgsEls.length > 1) {
         const imgsSrcArr = Array.from(imgsEls)
-          .map((img) => img.getAttribute("data-src") || img.src)
-          .filter((src) => src?.includes(".png"));
+          .map((img) => img.getAttribute("data-src") ?? img.src)
+          .filter((src) => !src?.includes("PDP"));
 
         imgsSrcFiltered = Array.from(new Set(imgsSrcArr));
 
         // to arrange the photos urls correctly because of the infinite carousel the first photo is the last one.
-        imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
+        if (imgsSrcFiltered.length > 0)
+          imgsSrcFiltered.push(imgsSrcFiltered.shift() ?? "");
       }
 
       const colorName =
@@ -187,7 +188,7 @@ const updateRealTimeDataBaseWithColorsImgs = async (
     let videoSrc = "";
     let thumbnailSrc = "";
 
-    const title = document.querySelector("h1")?.textContent || "N/A";
+    const title = document.querySelector("h1")?.textContent ?? "N/A";
 
     const buttonsArr = Array.from(
       document.querySelectorAll<HTMLButtonElement>(".ColorSwatchButton")
@@ -209,7 +210,9 @@ const updateRealTimeDataBaseWithColorsImgs = async (
       );
 
       if (VideoThumbnailImgEl) {
-        thumbnailSrc = VideoThumbnailImgEl.getAttribute("data-src") || "";
+        thumbnailSrc =
+          VideoThumbnailImgEl.getAttribute("data-src") ??
+          VideoThumbnailImgEl.src;
       }
     }
 
@@ -219,7 +222,7 @@ const updateRealTimeDataBaseWithColorsImgs = async (
           ".PdpCarouselWrapper__hero-gallery--thumbnails .Carousel img"
         )
       )
-        .find((img) => img.getAttribute("data-src")?.includes("jpg"))
+        .find((img) => img.getAttribute("data-src")?.includes("PDP"))
         ?.getAttribute("data-src") ?? "";
 
     const colorsArr = Array.from(
@@ -245,7 +248,6 @@ const updateRealTimeDataBaseWithColorsImgs = async (
     };
   });
 
-  console.log(initProductData.colorsArr);
   for (let [name, url] of Object.entries(initProductData.initData)) {
     await downloadFiles(name, [url], initDataFolderPath);
   }
