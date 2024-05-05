@@ -325,7 +325,7 @@ const updateRealTimeDataBaseWithColorsImgs = async (
         console.log(`message: ${error.message}/ cause: ${error.cause}`);
     }
   }
-
   await browser.close();
   await database.app.delete();
+  console.log("Script Completed");
 })();
