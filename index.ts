@@ -17,11 +17,20 @@ const collectionNameIndex = process.argv.findIndex((arg) =>
   arg.startsWith("--")
 );
 
+if (collectionNameIndex === -1)
+  throw new Error("please provide collection name as a flag starts with --");
+
 // Pass the collection name as a flag from the terminal
-const collectionName = process.argv.splice(3, 1)[0].replace("--", "");
+const collectionName = process.argv
+  .splice(collectionNameIndex, 1)[0]
+  .replace("--", "");
 
 // Pass the product urls as an arguments from the terminal
 const URLsArr = [...process.argv.slice(2)];
+
+if (URLsArr.length === 0)
+  throw new Error("please provide at least 1 url to scrape");
+
 const imagesFolderPath = path.join(
   dirname(fileURLToPath(import.meta.url)),
   "../images"
