@@ -338,7 +338,6 @@ const execScript = async (URL: string, productRoute: string) => {
     }
   }
   await browser.close();
-  await database.app.delete();
   console.log("Script Completed");
 };
 
@@ -346,3 +345,4 @@ for (let i = 0; i < URLsArr.length; i++) {
   const productRoute = URLsArr[i]?.substring(URLsArr[i]?.lastIndexOf("/") + 1);
   await execScript(URLsArr[i], productRoute);
 }
+await database.app.delete();
