@@ -338,7 +338,7 @@ const execScript = async (URL: string, productRoute: string) => {
     }
   }
   await browser.close();
-  console.log(`Scraping product ${initProductData.title} done`);
+  console.log(`Scraping product ${initProductData.title} is done`);
 };
 
 for (let i = 0; i < URLsArr.length; i++) {
