@@ -338,7 +338,7 @@ const execScript = async (URL: string, productRoute: string) => {
     }
   }
   await browser.close();
-  console.log("Script Completed");
+  console.log(`Scraping product ${initProductData.title} done`);
 };
 
 for (let i = 0; i < URLsArr.length; i++) {
@@ -346,3 +346,4 @@ for (let i = 0; i < URLsArr.length; i++) {
   await execScript(URLsArr[i], productRoute);
 }
 await database.app.delete();
+console.log("Script is done");
