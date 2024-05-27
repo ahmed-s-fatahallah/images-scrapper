@@ -13,11 +13,15 @@ const config = {
   },
 } as const;
 
-// Pass the product url as an argument from the terminal
-const URL = process.argv.find((arg) => arg.includes("http"));
+const collectionNameIndex = process.argv.findIndex((arg) =>
+  arg.startsWith("--")
+);
 
-const productRoute = URL?.substring(URL?.lastIndexOf("/") + 1);
+// Pass the collection name as a flag from the terminal
+const collectionName = process.argv.splice(3, 1)[0].replace("--", "");
 
+// Pass the product urls as an arguments from the terminal
+const URLsArr = [...process.argv.slice(2)];
 const imagesFolderPath = path.join(
   dirname(fileURLToPath(import.meta.url)),
   "../images"
@@ -106,6 +110,7 @@ const uploadFilesToFirebaseStorage = async (
 };
 
 const updateRealTimeDataBaseWithColorsImgs = async (
+  productRoute: string,
   imagesUrls: string[],
   colorName: string,
   rgb: string,
@@ -114,16 +119,16 @@ const updateRealTimeDataBaseWithColorsImgs = async (
 ) => {
   const productObjRef = database.ref("products");
   await productObjRef
-    .child(`${productRoute}/colors/${index}/imgs`)
+    .child(`${collectionName}/${productRoute}/colors/${index}/imgs`)
     .set(imagesUrls);
   await productObjRef
-    .child(`${productRoute}/colors/${index}`)
+    .child(`${collectionName}/${productRoute}/colors/${index}`)
     .update({ colorName, rgb, type, sliderImg: imagesUrls[0] });
 
   console.log(`Database Updated-${index}`);
 };
 
-(async () => {
+const execScript = async (URL: string, productRoute: string) => {
   if (!URL) return;
 
   const browser = await puppeteer.launch(config);
@@ -248,14 +253,16 @@ const updateRealTimeDataBaseWithColorsImgs = async (
   }
 
   const filesDataArr = await uploadFilesToFirebaseStorage(
-    `productsImages/${initProductData.title}`,
+    `productsImages/${collectionName}/${initProductData.title}`,
     initDataFolderPath
   );
 
   if (filesDataArr) {
     const productObjRef = database.ref("products");
     for (let file of filesDataArr) {
-      await productObjRef.child(`${productRoute}`).update(file);
+      await productObjRef
+        .child(`${collectionName}/${productRoute}`)
+        .update(file);
     }
 
     console.log("updated realtime database with video and video thumbnail");
@@ -287,7 +294,7 @@ const updateRealTimeDataBaseWithColorsImgs = async (
       );
 
       const imagesObjArr = await uploadFilesToFirebaseStorage(
-        `productsImages/${initProductData.title}/${productObj.colorName}`,
+        `productsImages/${collectionName}/${initProductData.title}/${productObj.colorName}`,
         imagesFolderPath
       );
 
@@ -300,6 +307,7 @@ const updateRealTimeDataBaseWithColorsImgs = async (
       }, []);
 
       await updateRealTimeDataBaseWithColorsImgs(
+        productRoute,
         imagesUrls,
         productObj.colorName,
         productObj.rgbValue,
@@ -323,4 +331,9 @@ const updateRealTimeDataBaseWithColorsImgs = async (
   await browser.close();
   await database.app.delete();
   console.log("Script Completed");
-})();
+};
+
+for (let i = 0; i < URLsArr.length; i++) {
+  const productRoute = URLsArr[i]?.substring(URLsArr[i]?.lastIndexOf("/") + 1);
+  await execScript(URLsArr[i], productRoute);
+}
