@@ -127,6 +127,7 @@ const updateRealTimeDataBaseWithColorsImgs = async (
   index: number
 ) => {
   const productObjRef = database.ref("products");
+
   await productObjRef
     .child(`${collectionName}/${productRoute}/colors/${index}/imgs`)
     .set(imagesUrls);
@@ -135,6 +136,57 @@ const updateRealTimeDataBaseWithColorsImgs = async (
     .update({ colorName, rgb, type, sliderImg: imagesUrls[0] });
 
   console.log(`Database Updated-${index}`);
+};
+
+const updateRealTimeDataBaseWithInitData = async (
+  productRoute: string,
+  title: string,
+  price: string,
+  bigImgsObjArr: {
+    imgUrl: string;
+    sTitle: string;
+    bTitle: string;
+    text: string;
+  }[],
+  sizesArr: string[],
+  filesDataArr:
+    | {
+        [name: string]: string;
+      }[]
+    | undefined
+) => {
+  const bestForArr = ["wet weather", "cold weather", "everyday"];
+
+  const productObjRef = database.ref("products");
+  productObjRef.child(`${collectionName}/${productRoute}/title`).set(title);
+  productObjRef.child(`${collectionName}/${productRoute}/price`).set(price);
+  productObjRef
+    .child(`${collectionName}/${productRoute}/bigImgs`)
+    .set(bigImgsObjArr);
+  productObjRef.child(`${collectionName}/${productRoute}/sizes`).set(sizesArr);
+  productObjRef
+    .child(`${collectionName}/${productRoute}/bestfor`)
+    .set(bestForArr[Math.floor(Math.random() * bestForArr.length)]);
+  productObjRef
+    .child(`${collectionName}/${productRoute}/material`)
+    .set(
+      title.toLowerCase().includes("tree")
+        ? "tree"
+        : title.toLowerCase().includes("wool")
+        ? "wool"
+        : "cotton"
+    );
+
+  if (filesDataArr) {
+    for (let file of filesDataArr) {
+      await productObjRef
+        .child(`${collectionName}/${productRoute}`)
+        .update(file);
+    }
+  } else {
+    console.log(`no video or video thumbnail found for ${title}`);
+  }
+  console.log("updated realtime database with initial product data");
 };
 
 const execScript = async (URL: string, productRoute: string) => {
@@ -223,6 +275,31 @@ const execScript = async (URL: string, productRoute: string) => {
       document.querySelectorAll<HTMLImageElement>(".ThumbnailButton > img")
     );
 
+    const bigImgsSectionsObjArr = Array.from(
+      document.querySelectorAll<HTMLDivElement>(".PdpProductPart"),
+      (el) => {
+        const imgUrl =
+          el.querySelector("img")?.getAttribute("data-src") ?? "N/A";
+        const sTitle = el.querySelector("h4")?.textContent ?? "N/A";
+        const bTitle = el.querySelector("h2")?.textContent ?? "N/A";
+        const text = el.querySelector("p")?.textContent ?? "N/A";
+
+        return { imgUrl, sTitle, bTitle, text };
+      }
+    );
+
+    const price =
+      document
+        .querySelector(".PdpMasterProductDetails__price-section p")
+        ?.textContent?.match(/\d+/)?.[0] ?? "N/A";
+
+    const sizesArr = Array.from(
+      document.querySelectorAll(".PdpSizeSelector__grid li"),
+      (el) => {
+        return el.textContent ?? "N/A";
+      }
+    );
+
     if (sidebarImgs) {
       const VideoThumbnailImgEl = sidebarImgs.find((img) =>
         img.getAttribute("data-testid")?.includes("video")
@@ -254,6 +331,9 @@ const execScript = async (URL: string, productRoute: string) => {
         video: videoSrc,
         videoThumbnail: thumbnailSrc,
       },
+      bigImgsSectionsObjArr,
+      price,
+      sizesArr,
     };
   });
 
@@ -266,17 +346,38 @@ const execScript = async (URL: string, productRoute: string) => {
     initDataFolderPath
   );
 
-  if (filesDataArr) {
-    const productObjRef = database.ref("products");
-    for (let file of filesDataArr) {
-      await productObjRef
-        .child(`${collectionName}/${productRoute}`)
-        .update(file);
-    }
-
-    console.log("updated realtime database with video and video thumbnail");
+  for (let i = 0; i < initProductData.bigImgsSectionsObjArr.length; i++) {
+    const url = initProductData.bigImgsSectionsObjArr[i].imgUrl;
+    await downloadFiles(`bigImg-${i}`, [url], initDataFolderPath);
   }
 
+  const bigImgsUrlsArr = await uploadFilesToFirebaseStorage(
+    `productsImages/${collectionName}/${initProductData.title}/bigImgs`,
+    initDataFolderPath
+  );
+  let updatedBigImgsObjArr: {
+    imgUrl: string;
+    sTitle: string;
+    bTitle: string;
+    text: string;
+  }[] = [];
+  if (bigImgsUrlsArr) {
+    updatedBigImgsObjArr = initProductData.bigImgsSectionsObjArr.map(
+      (el, i) => {
+        el.imgUrl = Object.values(bigImgsUrlsArr[i])[0];
+        return el;
+      }
+    );
+  }
+
+  await updateRealTimeDataBaseWithInitData(
+    productRoute,
+    initProductData.title,
+    initProductData.price,
+    updatedBigImgsObjArr,
+    initProductData.sizesArr,
+    filesDataArr
+  );
   let colorPosition = 0;
 
   for (let i = 0; i < initProductData.colorsArr.length; i++) {
