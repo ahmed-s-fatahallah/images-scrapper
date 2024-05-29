@@ -144,8 +144,8 @@ const updateRealTimeDataBaseWithInitData = async (
   price: string,
   bigImgsObjArr: {
     imgUrl: string;
-    sTitle: string;
-    bTitle: string;
+    "s-title": string;
+    "b-title": string;
     text: string;
   }[],
   sizesArr: string[],
@@ -155,7 +155,7 @@ const updateRealTimeDataBaseWithInitData = async (
       }[]
     | undefined
 ) => {
-  const bestForArr = ["wet weather", "cold weather", "everyday"];
+  const bestForArr = ["wet weather", "cool weather", "everyday"];
 
   const productObjRef = database.ref("products");
   productObjRef.child(`${collectionName}/${productRoute}/title`).set(title);
@@ -357,15 +357,20 @@ const execScript = async (URL: string, productRoute: string) => {
   );
   let updatedBigImgsObjArr: {
     imgUrl: string;
-    sTitle: string;
-    bTitle: string;
+    "s-title": string;
+    "b-title": string;
     text: string;
   }[] = [];
   if (bigImgsUrlsArr) {
     updatedBigImgsObjArr = initProductData.bigImgsSectionsObjArr.map(
       (el, i) => {
         el.imgUrl = Object.values(bigImgsUrlsArr[i])[0];
-        return el;
+        return {
+          imgUrl: el.imgUrl,
+          "b-title": el.bTitle,
+          "s-title": el.sTitle,
+          text: el.text,
+        };
       }
     );
   }
